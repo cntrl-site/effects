@@ -1,5 +1,5 @@
 {
-  "name": "effects",
+  "name": "@cntrl-site/effects",
   "version": "1.0.0",
   "description": "FX Module for websites made in Control.",
   "main": "lib/index.js",
