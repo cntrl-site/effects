@@ -1,0 +1,32 @@
+{
+  "name": "effects",
+  "version": "1.0.0",
+  "description": "FX Module for websites made in Control.",
+  "main": "lib/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "prebuild": "rm -rf ./lib",
+    "test": "jest",
+    "build": "tsc --project tsconfig.build.json",
+    "prepublishOnly": "NODE_ENV=production npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cntrl-site/effects.git"
+  },
+  "author": "arsen@momdesign.nyc",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cntrl-site/effects/issues"
+  },
+  "directories": {
+    "lib": "lib"
+  },
+  "homepage": "https://github.com/cntrl-site/effects#readme",
+  "devDependencies": {
+    "@tsconfig/node16": "^16.1.1",
+    "@tsconfig/recommended": "^1.0.3",
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3"
+  }
+}
