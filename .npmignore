@@ -1,0 +1,6 @@
+/node_modules/
+/jest.config.json
+/tsconfig.json
+/tsconfig.build.json
+/.git/
+/.github/
