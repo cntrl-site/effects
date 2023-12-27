@@ -30,7 +30,10 @@ precision mediump float;
 
 // our texture
 uniform sampler2D u_image;
+uniform sampler2D u_pattern;
 uniform float u_time;
+uniform vec2 u_imgDimensions;
+uniform vec2 u_patternDimensions;
 
 // the texCoords passed in from the vertex shader.
 varying vec2 v_texCoord;
@@ -144,13 +147,19 @@ export class ImageEffect implements EffectRenderer {
     // shader prop: u_time
     const timeLocation = gl.getUniformLocation(program, 'u_time');
     gl.uniform1f(timeLocation, this.fxParams.time);
-    // img dimensions
+    // img + dimensions
+    const imageLocation = gl.getUniformLocation(program, 'u_image');
     const dimensionsLocation = gl.getUniformLocation(program, 'u_imgDimensions');
     gl.uniform2f(dimensionsLocation, this.image.width, this.image.height);
-    // pattern dimensions
+    // pattern + dimensions
+    const patternLocation = gl.getUniformLocation(program, 'u_pattern');
     const patternDimensionsLocation = gl.getUniformLocation(program, 'u_patternDimensions');
     gl.uniform2f(patternDimensionsLocation, this.pattern.width, this.pattern.height);
+    gl.uniform1i(imageLocation, 0);
+    gl.uniform1i(patternLocation, 1);
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, patternTexture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
@@ -190,7 +199,7 @@ export class ImageEffect implements EffectRenderer {
       this.loadTexture(gl, this.image, 'texture');
     }
     if (!this.cacheGet(gl, 'patternTexture')) {
-      this.loadTexture(gl, this.pattern, 'patternTexture');
+      this.loadTexture(gl, this.pattern, 'patternTexture', gl.NEAREST);
     }
   }
 
@@ -259,7 +268,8 @@ export class ImageEffect implements EffectRenderer {
   private loadTexture(
     gl: WebGL2RenderingContext,
     image: HTMLImageElement,
-    cacheKey: keyof FxCache
+    cacheKey: keyof FxCache,
+    filter: number = gl.LINEAR
   ): void {
     if (!this.ready()) return;
     const texture = gl.createTexture();
@@ -267,8 +277,8 @@ export class ImageEffect implements EffectRenderer {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
     this.cacheSet(gl, cacheKey, texture);
   }
