@@ -48,12 +48,14 @@ interface ImageFxParams {
 type FxCache = {
   program?: WebGLProgram;
   texture?: WebGLTexture;
+  patternTexture?: WebGLTexture;
   positionBuffer?: WebGLBuffer;
   texCoordBuffer?: WebGLBuffer;
 };
 
 export class ImageEffect implements EffectRenderer {
   private image: HTMLImageElement;
+  private pattern: HTMLImageElement;
   private vpWidth: number = 100;
   private vpHeight: number = 100;
   private fxParams: ImageFxParams;
@@ -62,12 +64,16 @@ export class ImageEffect implements EffectRenderer {
 
   constructor(
     url: string,
+    patternUrl: string,
     fragmentShaderSrc: string,
     params: ImageFxParams
   ) {
     this.image = new Image();
     this.image.crossOrigin = 'anonymous';
     this.image.src = url;
+    this.pattern = new Image();
+    this.pattern.crossOrigin = 'anonymous';
+    this.pattern.src = patternUrl;
     this.fxParams = { ...params };
     this.fragmentShaderSrc = fragmentShaderSrc ? fragmentShaderSrc : defaultShader;
   }
@@ -140,6 +146,9 @@ export class ImageEffect implements EffectRenderer {
     // img dimensions
     const dimensionsLocation = gl.getUniformLocation(program, 'u_imgDimensions');
     gl.uniform2f(dimensionsLocation, this.image.width, this.image.height);
+    // pattern dimensions
+    const patternDimensionsLocation = gl.getUniformLocation(program, 'u_patternDimensions');
+    gl.uniform2f(patternDimensionsLocation, this.pattern.width, this.pattern.height);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
@@ -176,7 +185,10 @@ export class ImageEffect implements EffectRenderer {
       this.createTexCoordBuffer(gl);
     }
     if (!this.cacheGet(gl, 'texture')) {
-      this.loadTexture(gl);
+      this.loadTexture(gl, this.image, 'texture');
+    }
+    if (!this.cacheGet(gl, 'patternTexture')) {
+      this.loadTexture(gl, this.pattern, 'patternTexture');
     }
   }
 
@@ -243,7 +255,9 @@ export class ImageEffect implements EffectRenderer {
   }
 
   private loadTexture(
-    gl: WebGL2RenderingContext
+    gl: WebGL2RenderingContext,
+    image: HTMLImageElement,
+    cacheKey: keyof FxCache
   ): void {
     if (!this.ready()) return;
     const texture = gl.createTexture();
@@ -253,8 +267,8 @@ export class ImageEffect implements EffectRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.image);
-    this.cacheSet(gl, 'texture', texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    this.cacheSet(gl, cacheKey, texture);
   }
 
   private createTexCoordBuffer(gl: WebGL2RenderingContext): void {
