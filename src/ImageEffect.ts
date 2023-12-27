@@ -105,6 +105,7 @@ export class ImageEffect implements EffectRenderer {
     const posBuffer = this.cacheGet(gl, 'positionBuffer')!;
     const texBuffer = this.cacheGet(gl, 'texCoordBuffer')!;
     const texture = this.cacheGet(gl, 'texture')!;
+    const patternTexture = this.cacheGet(gl, 'patternTexture')!;
     gl.viewport(0, 0, this.vpWidth, this.vpHeight);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -150,6 +151,7 @@ export class ImageEffect implements EffectRenderer {
     const patternDimensionsLocation = gl.getUniformLocation(program, 'u_patternDimensions');
     gl.uniform2f(patternDimensionsLocation, this.pattern.width, this.pattern.height);
     gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.bindTexture(gl.TEXTURE_2D, patternTexture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
