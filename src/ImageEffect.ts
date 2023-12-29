@@ -70,6 +70,7 @@ export class ImageEffect implements EffectRenderer {
   constructor(
     url: string,
     patternUrl: string,
+    pattern2Url: string,
     fragmentShaderSrc: string,
     params: ImageFxParams
   ) {
@@ -81,7 +82,7 @@ export class ImageEffect implements EffectRenderer {
     this.pattern1.src = patternUrl;
     this.pattern2 = new Image();
     this.pattern2.crossOrigin = 'anonymous';
-    this.pattern2.src = patternUrl;
+    this.pattern2.src = pattern2Url;
     this.fxParams = { ...params };
     this.fragmentShaderSrc = fragmentShaderSrc ? fragmentShaderSrc : defaultShader;
   }
