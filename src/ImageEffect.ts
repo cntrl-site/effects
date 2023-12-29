@@ -51,14 +51,16 @@ interface ImageFxParams {
 type FxCache = {
   program?: WebGLProgram;
   texture?: WebGLTexture;
-  patternTexture?: WebGLTexture;
+  pattern1Texture?: WebGLTexture;
+  pattern2Texture?: WebGLTexture;
   positionBuffer?: WebGLBuffer;
   texCoordBuffer?: WebGLBuffer;
 };
 
 export class ImageEffect implements EffectRenderer {
   private image: HTMLImageElement;
-  private pattern: HTMLImageElement;
+  private pattern1: HTMLImageElement;
+  private pattern2: HTMLImageElement;
   private vpWidth: number = 100;
   private vpHeight: number = 100;
   private fxParams: ImageFxParams;
@@ -74,9 +76,12 @@ export class ImageEffect implements EffectRenderer {
     this.image = new Image();
     this.image.crossOrigin = 'anonymous';
     this.image.src = url;
-    this.pattern = new Image();
-    this.pattern.crossOrigin = 'anonymous';
-    this.pattern.src = patternUrl;
+    this.pattern1 = new Image();
+    this.pattern1.crossOrigin = 'anonymous';
+    this.pattern1.src = patternUrl;
+    this.pattern2 = new Image();
+    this.pattern2.crossOrigin = 'anonymous';
+    this.pattern2.src = patternUrl;
     this.fxParams = { ...params };
     this.fragmentShaderSrc = fragmentShaderSrc ? fragmentShaderSrc : defaultShader;
   }
@@ -108,7 +113,8 @@ export class ImageEffect implements EffectRenderer {
     const posBuffer = this.cacheGet(gl, 'positionBuffer')!;
     const texBuffer = this.cacheGet(gl, 'texCoordBuffer')!;
     const texture = this.cacheGet(gl, 'texture')!;
-    const patternTexture = this.cacheGet(gl, 'patternTexture')!;
+    const pattern1Texture = this.cacheGet(gl, 'pattern1Texture')!;
+    const pattern2Texture = this.cacheGet(gl, 'pattern2Texture')!;
     gl.viewport(0, 0, this.vpWidth, this.vpHeight);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -154,13 +160,19 @@ export class ImageEffect implements EffectRenderer {
     // pattern + dimensions
     const patternLocation = gl.getUniformLocation(program, 'u_pattern');
     const patternDimensionsLocation = gl.getUniformLocation(program, 'u_patternDimensions');
-    gl.uniform2f(patternDimensionsLocation, this.pattern.width, this.pattern.height);
+    const pattern2Location = gl.getUniformLocation(program, 'u_pattern2');
+    const pattern2DimensionsLocation = gl.getUniformLocation(program, 'u_pattern2Dimensions');
+    gl.uniform2f(patternDimensionsLocation, this.pattern1.width, this.pattern1.height);
+    gl.uniform2f(pattern2DimensionsLocation, this.pattern2.width, this.pattern2.height);
     gl.uniform1i(imageLocation, 0);
     gl.uniform1i(patternLocation, 1);
+    gl.uniform1i(pattern2Location, 2);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, patternTexture);
+    gl.bindTexture(gl.TEXTURE_2D, pattern1Texture);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, pattern2Texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
@@ -198,8 +210,11 @@ export class ImageEffect implements EffectRenderer {
     if (!this.cacheGet(gl, 'texture')) {
       this.loadTexture(gl, this.image, 'texture');
     }
-    if (!this.cacheGet(gl, 'patternTexture')) {
-      this.loadTexture(gl, this.pattern, 'patternTexture', gl.NEAREST);
+    if (!this.cacheGet(gl, 'pattern1Texture')) {
+      this.loadTexture(gl, this.pattern1, 'pattern1Texture', gl.NEAREST);
+    }
+    if (!this.cacheGet(gl, 'pattern2Texture')) {
+      this.loadTexture(gl, this.pattern2, 'pattern2Texture', gl.NEAREST);
     }
   }
 
