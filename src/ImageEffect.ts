@@ -1,4 +1,5 @@
 import { EffectRenderer } from './types/EffectRenderer';
+import { ShaderParamAny } from './types/ShaderParam';
 
 const vertexShader2d = `
 attribute vec2 a_position;
@@ -43,9 +44,9 @@ void main() {
   gl_FragColor = texture2D(u_image, v_texCoord);
 }`;
 
-interface ImageFxParams {
+interface ImageFxParams extends Record<string, ShaderParamAny['value']>{
   time: number;
-  cursor: [number, number]; // user's cursor relative to the image
+  cursor: [number, number];
 }
 
 type FxCache = {
@@ -109,6 +110,7 @@ export class ImageEffect implements EffectRenderer {
 
   render(gl: WebGL2RenderingContext): void {
     if (!this.ready()) return;
+    const { time, cursor, ...restParams } = this.fxParams;
     this.ensureCache(gl);
     const program = this.cacheGet(gl, 'program')!;
     const posBuffer = this.cacheGet(gl, 'positionBuffer')!;
@@ -150,10 +152,15 @@ export class ImageEffect implements EffectRenderer {
     gl.uniform2f(resLocation, this.vpWidth, this.vpHeight);
     // shader prop: u_cursor
     const cursorLocation = gl.getUniformLocation(program, 'u_cursor');
-    gl.uniform2f(cursorLocation, this.fxParams.cursor[0], this.fxParams.cursor[1]);
+    gl.uniform2f(cursorLocation, ...cursor);
     // shader prop: u_time
     const timeLocation = gl.getUniformLocation(program, 'u_time');
-    gl.uniform1f(timeLocation, this.fxParams.time);
+    gl.uniform1f(timeLocation, time);
+    for (const [key, paramValue] of Object.entries(restParams)) {
+      const location = gl.getUniformLocation(program, key);
+      // @ts-ignore
+      gl.uniform1f(location, paramValue);
+    }
     // img + dimensions
     const imageLocation = gl.getUniformLocation(program, 'u_image');
     const dimensionsLocation = gl.getUniformLocation(program, 'u_imgDimensions');
