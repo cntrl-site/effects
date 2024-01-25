@@ -274,8 +274,7 @@ export class ImageEffect implements EffectRenderer {
       const lastError = gl.getShaderInfoLog(shader);
       const error = new Error(`Error during compilation of shader ${shader}: ${lastError}`);
       gl.deleteShader(shader);
-      // TODO add err handling
-      // throw error;
+      console.error(error);
     }
     return shader;
   }
