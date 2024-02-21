@@ -77,7 +77,7 @@ export class ImageEffect implements EffectRenderer {
   ) {
     this.image = new Image();
     this.image.crossOrigin = 'anonymous';
-    this.image.src = `${url}?dt=${Date.now()}`;
+    this.image.src = url.startsWith('blob') ? url : `${url}?dt=${Date.now()}`;
     this.pattern1 = new Image();
     this.pattern1.crossOrigin = 'anonymous';
     this.pattern1.src = patternUrl;
