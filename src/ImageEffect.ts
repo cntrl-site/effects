@@ -73,7 +73,9 @@ export class ImageEffect implements EffectRenderer {
     patternUrl: string,
     pattern2Url: string,
     fragmentShaderSrc: string,
-    params: ImageFxParams
+    params: ImageFxParams,
+    private imageWidth: number,
+    private imageHeight: number
   ) {
     this.image = new Image();
     this.image.crossOrigin = 'anonymous';
@@ -164,7 +166,7 @@ export class ImageEffect implements EffectRenderer {
     // img + dimensions
     const imageLocation = gl.getUniformLocation(program, 'u_image');
     const dimensionsLocation = gl.getUniformLocation(program, 'u_imgDimensions');
-    gl.uniform2f(dimensionsLocation, this.image.width, this.image.height);
+    gl.uniform2f(dimensionsLocation, this.imageWidth, this.imageHeight);
     // pattern + dimensions
     const patternLocation = gl.getUniformLocation(program, 'u_pattern');
     const patternDimensionsLocation = gl.getUniformLocation(program, 'u_patternDimensions');
