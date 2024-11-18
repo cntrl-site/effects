@@ -1,5 +1,6 @@
 import { EffectRenderer } from './types/EffectRenderer';
 import { ShaderParamAny } from './types/ShaderParam';
+import { TextureManager } from './types/TextureManager';
 
 const vertexShader2d = `
 attribute vec2 a_position;
@@ -44,7 +45,7 @@ void main() {
   gl_FragColor = texture2D(u_image, v_texCoord);
 }`;
 
-interface ImageFxParams extends Record<string, ShaderParamAny['value']>{
+interface MediaFxParams extends Record<string, ShaderParamAny['value']> {
   time: number;
   cursor: [number, number];
 }
@@ -58,28 +59,24 @@ type FxCache = {
   texCoordBuffer?: WebGLBuffer;
 };
 
-export class ImageEffect implements EffectRenderer {
-  private image: HTMLImageElement;
+export class MediaEffect implements EffectRenderer {
   private pattern1: HTMLImageElement;
   private pattern2: HTMLImageElement;
   private vpWidth: number = 100;
   private vpHeight: number = 100;
-  private fxParams: ImageFxParams;
+  private fxParams: MediaFxParams;
   private cache: WeakMap<WebGL2RenderingContext, FxCache> = new WeakMap();
   private fragmentShaderSrc: string;
 
   constructor(
-    url: string,
+    private textureManager: TextureManager,
     patternUrl: string,
     pattern2Url: string,
     fragmentShaderSrc: string,
-    params: ImageFxParams,
+    params: MediaFxParams,
     private imageWidth: number,
     private imageHeight: number
   ) {
-    this.image = new Image();
-    this.image.crossOrigin = 'anonymous';
-    this.image.src = url.startsWith('blob') ? url : `${url}?dt=${Date.now()}`;
     this.pattern1 = new Image();
     this.pattern1.crossOrigin = 'anonymous';
     this.pattern1.src = patternUrl;
@@ -87,7 +84,7 @@ export class ImageEffect implements EffectRenderer {
     this.pattern2.crossOrigin = 'anonymous';
     this.pattern2.src = pattern2Url;
     this.fxParams = { ...params };
-    this.fragmentShaderSrc = fragmentShaderSrc ? fragmentShaderSrc : defaultShader;
+    this.fragmentShaderSrc = fragmentShaderSrc || defaultShader;
   }
 
   setViewport(width: number, height: number): void {
@@ -95,15 +92,15 @@ export class ImageEffect implements EffectRenderer {
     this.vpHeight = height;
   }
 
-  setParam<T extends keyof ImageFxParams>(
+  setParam<T extends keyof MediaFxParams>(
     name: T,
-    value: ImageFxParams[T]
+    value: MediaFxParams[T]
   ): void {
     this.fxParams[name] = value;
   }
 
   ready(): boolean {
-    return this.image.complete;
+    return this.textureManager.ready();
   }
 
   prepare(gl: WebGL2RenderingContext): void {
@@ -120,6 +117,20 @@ export class ImageEffect implements EffectRenderer {
     const texture = this.cacheGet(gl, 'texture')!;
     const pattern1Texture = this.cacheGet(gl, 'pattern1Texture')!;
     const pattern2Texture = this.cacheGet(gl, 'pattern2Texture')!;
+
+    if (this.textureManager.updatesOnRender()) {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        this.textureManager.getElement()
+      );
+    }
+
     gl.viewport(0, 0, this.vpWidth, this.vpHeight);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -128,7 +139,7 @@ export class ImageEffect implements EffectRenderer {
     // shader prop: a_position
     const posLocation = gl.getAttribLocation(program, 'a_position');
     gl.enableVertexAttribArray(posLocation);
-    gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer)
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
     gl.vertexAttribPointer(
       posLocation,
       2,
@@ -160,7 +171,7 @@ export class ImageEffect implements EffectRenderer {
     gl.uniform1f(timeLocation, time);
     for (const [key, paramValue] of Object.entries(restParams)) {
       const location = gl.getUniformLocation(program, key);
-      // @ts-ignore
+      // @ts-expect-error number | [number, number] TODO type properly when [n,n] is used
       gl.uniform1f(location, paramValue);
     }
     // img + dimensions
@@ -189,7 +200,7 @@ export class ImageEffect implements EffectRenderer {
   private setupPosition(gl: WebGL2RenderingContext): void {
     const posBuffer = this.cacheGet(gl, 'positionBuffer')!;
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-    const imgAspectRatio = this.image.width / this.image.height;
+    const imgAspectRatio = this.textureManager.getWidth() / this.textureManager.getHeight();
     const itemAspectRatio = this.vpWidth / this.vpHeight;
     const rw = itemAspectRatio < imgAspectRatio ? this.vpHeight * imgAspectRatio : this.vpWidth;
     const rh = itemAspectRatio < imgAspectRatio ? this.vpHeight : this.vpWidth / imgAspectRatio;
@@ -198,12 +209,18 @@ export class ImageEffect implements EffectRenderer {
     const x2 = x1 + rw;
     const y2 = y1 + rh;
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      x1, y1,
-      x2, y1,
-      x1, y2,
-      x1, y2,
-      x2, y1,
-      x2, y2,
+      x1,
+      y1,
+      x2,
+      y1,
+      x1,
+      y2,
+      x1,
+      y2,
+      x2,
+      y1,
+      x2,
+      y2,
     ]), gl.STATIC_DRAW);
   }
 
@@ -218,7 +235,7 @@ export class ImageEffect implements EffectRenderer {
       this.createTexCoordBuffer(gl);
     }
     if (!this.cacheGet(gl, 'texture')) {
-      this.loadTexture(gl, this.image, 'texture');
+      this.loadTexture(gl, this.textureManager.getElement(), 'texture');
     }
     if (!this.cacheGet(gl, 'pattern1Texture')) {
       this.loadTexture(gl, this.pattern1, 'pattern1Texture', gl.NEAREST);
@@ -291,7 +308,7 @@ export class ImageEffect implements EffectRenderer {
 
   private loadTexture(
     gl: WebGL2RenderingContext,
-    image: HTMLImageElement,
+    media: HTMLImageElement | HTMLVideoElement,
     cacheKey: keyof FxCache,
     filter: number = gl.LINEAR
   ): void {
@@ -305,7 +322,7 @@ export class ImageEffect implements EffectRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, media);
     this.cacheSet(gl, cacheKey, texture);
   }
 
@@ -314,12 +331,18 @@ export class ImageEffect implements EffectRenderer {
     if (!buffer) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      0.0, 0.0,
-      1.0, 0.0,
-      0.0, 1.0,
-      0.0, 1.0,
-      1.0, 0.0,
-      1.0, 1.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0,
+      1.0,
+      1.0,
     ]), gl.STATIC_DRAW);
     this.cacheSet(gl, 'texCoordBuffer', buffer);
   }
