@@ -3,4 +3,5 @@ export interface TextureManager {
   ready(): boolean;
   getWidth(): number;
   getHeight(): number;
+  updatesOnRender(): boolean;
 }

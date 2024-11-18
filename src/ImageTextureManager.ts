@@ -9,6 +9,10 @@ export class ImageTextureManager implements TextureManager {
     this.image.src = url.startsWith('blob') ? url : `${url}?dt=${Date.now()}`;
   }
 
+  updatesOnRender(): boolean {
+    return false;
+  }
+
   getElement(): HTMLImageElement {
     return this.image;
   }

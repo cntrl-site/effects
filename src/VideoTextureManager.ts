@@ -21,6 +21,10 @@ export class VideoTextureManager implements TextureManager {
     this.video = video;
   }
 
+  updatesOnRender(): boolean {
+    return true;
+  }
+
   onReadyStatusChange(listener: (isReady: boolean) => void): void {
     this.listeners.push(listener);
   }

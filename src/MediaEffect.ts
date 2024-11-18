@@ -118,17 +118,18 @@ export class MediaEffect implements EffectRenderer {
     const pattern1Texture = this.cacheGet(gl, 'pattern1Texture')!;
     const pattern2Texture = this.cacheGet(gl, 'pattern2Texture')!;
 
-    // Update video texture
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      this.textureManager.getElement()
-    );
+    if (this.textureManager.updatesOnRender()) {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        this.textureManager.getElement()
+      );
+    }
 
     gl.viewport(0, 0, this.vpWidth, this.vpHeight);
     gl.clearColor(0, 0, 0, 0);
