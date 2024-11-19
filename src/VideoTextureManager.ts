@@ -10,6 +10,8 @@ export class VideoTextureManager implements TextureManager {
     video.autoplay = true;
     video.muted = true;
     video.loop = true;
+    video.playsInline = true;
+    video.controls = true;
     video.crossOrigin = 'anonymous';
     video.addEventListener('loadedmetadata', () => {
       video.play().then(() => {
