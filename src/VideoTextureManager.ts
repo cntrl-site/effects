@@ -5,7 +5,10 @@ export class VideoTextureManager implements TextureManager {
   private isReady = false;
   private video: HTMLVideoElement;
 
-  constructor(videoUrl: string) {
+  constructor(
+    videoUrl: string,
+    onPlayError: (error: Error) => void
+  ) {
     const video = document.createElement('video');
     video.autoplay = true;
     video.muted = true;
@@ -14,10 +17,13 @@ export class VideoTextureManager implements TextureManager {
     video.controls = true;
     video.crossOrigin = 'anonymous';
     video.addEventListener('loadedmetadata', () => {
-      video.play().then(() => {
-        this.isReady = true;
-        this.listeners.forEach(listener => listener(true));
-      });
+      video
+        .play()
+        .then(() => {
+          this.isReady = true;
+          this.listeners.forEach((listener) => listener(true));
+        })
+        .catch(onPlayError);
     });
     video.src = videoUrl;
     this.video = video;
