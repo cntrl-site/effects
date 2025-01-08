@@ -67,7 +67,7 @@ export class MediaEffect implements EffectRenderer {
   private fxParams: MediaFxParams;
   private cache: WeakMap<WebGL2RenderingContext, FxCache> = new WeakMap();
   private fragmentShaderSrc: string;
-  private errorListeners: ((error: string) => void)[] = [];
+  private statusListeners: ((status: 'ready' | 'error', message?: string) => void)[] = [];
 
   constructor(
     private textureManager: TextureManager,
@@ -100,8 +100,8 @@ export class MediaEffect implements EffectRenderer {
     this.fxParams[name] = value;
   }
 
-  subscribeError(listener: (error: string) => void): void {
-    this.errorListeners.push(listener);
+  subscribeStatus(listener: (status: 'ready' | 'error', message?: string) => void): void {
+    this.statusListeners.push(listener);
   }
 
   ready(): boolean {
@@ -297,12 +297,15 @@ export class MediaEffect implements EffectRenderer {
     if (!compiled) {
       const lastError = gl.getShaderInfoLog(shader);
       if (lastError) {
-        this.errorListeners.forEach((listener) => listener(lastError));
+        this.statusListeners.forEach((listener) => listener('error', lastError));
       }
       const error = new Error(`Error during compilation of shader ${shader}: ${lastError}`);
       gl.deleteShader(shader);
       console.error(error);
+    } else {
+      this.statusListeners.forEach((listener) => listener('ready'));
     }
+
     return shader;
   }
 
