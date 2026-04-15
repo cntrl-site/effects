@@ -50,7 +50,16 @@ interface MediaFxParams extends Record<string, ShaderParamAny['value']> {
   cursor: [number, number];
 }
 
-const MAX_PATTERN_URLS = 3;
+export function mediaEffectPatternUniformNames(slotIndex: number): {
+  tex: string;
+  dim: string;
+} {
+  if (slotIndex === 0) {
+    return { tex: 'u_pattern', dim: 'u_patternDimensions' };
+  }
+  const n = slotIndex + 1;
+  return { tex: `u_pattern${n}`, dim: `u_pattern${n}Dimensions` };
+}
 
 type FxCache = {
   program?: WebGLProgram;
@@ -77,11 +86,6 @@ export class MediaEffect implements EffectRenderer {
     private imageWidth: number,
     private imageHeight: number
   ) {
-    if (patternUrls.length === 0 || patternUrls.length > MAX_PATTERN_URLS) {
-      throw new Error(
-        `MediaEffect expects between 1 and ${MAX_PATTERN_URLS} pattern URLs, got ${patternUrls.length}`
-      );
-    }
     this.patterns = patternUrls.map((url) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -186,15 +190,9 @@ export class MediaEffect implements EffectRenderer {
     const imageLocation = gl.getUniformLocation(program, 'u_image');
     const dimensionsLocation = gl.getUniformLocation(program, 'u_imgDimensions');
     gl.uniform2f(dimensionsLocation, this.imageWidth, this.imageHeight);
-    // patterns + dimensions (u_image = 0, u_pattern = 1, u_pattern2 = 2, u_pattern3 = 3)
-    const patternUniforms = [
-      { tex: 'u_pattern', dim: 'u_patternDimensions' },
-      { tex: 'u_pattern2', dim: 'u_pattern2Dimensions' },
-      { tex: 'u_pattern3', dim: 'u_pattern3Dimensions' },
-    ] as const;
     gl.uniform1i(imageLocation, 0);
     for (let i = 0; i < this.patterns.length; i++) {
-      const u = patternUniforms[i];
+      const u = mediaEffectPatternUniformNames(i);
       const texLoc = gl.getUniformLocation(program, u.tex);
       const dimLoc = gl.getUniformLocation(program, u.dim);
       const p = this.patterns[i];
