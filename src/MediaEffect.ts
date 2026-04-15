@@ -50,18 +50,18 @@ interface MediaFxParams extends Record<string, ShaderParamAny['value']> {
   cursor: [number, number];
 }
 
+const MAX_PATTERN_URLS = 3;
+
 type FxCache = {
   program?: WebGLProgram;
   texture?: WebGLTexture;
-  pattern1Texture?: WebGLTexture;
-  pattern2Texture?: WebGLTexture;
+  patternTextures?: WebGLTexture[];
   positionBuffer?: WebGLBuffer;
   texCoordBuffer?: WebGLBuffer;
 };
 
 export class MediaEffect implements EffectRenderer {
-  private pattern1: HTMLImageElement;
-  private pattern2: HTMLImageElement;
+  private patterns: HTMLImageElement[];
   private vpWidth: number = 100;
   private vpHeight: number = 100;
   private fxParams: MediaFxParams;
@@ -71,19 +71,23 @@ export class MediaEffect implements EffectRenderer {
 
   constructor(
     private textureManager: TextureManager,
-    patternUrl: string,
-    pattern2Url: string,
+    patternUrls: readonly string[],
     fragmentShaderSrc: string,
     params: MediaFxParams,
     private imageWidth: number,
     private imageHeight: number
   ) {
-    this.pattern1 = new Image();
-    this.pattern1.crossOrigin = 'anonymous';
-    this.pattern1.src = patternUrl;
-    this.pattern2 = new Image();
-    this.pattern2.crossOrigin = 'anonymous';
-    this.pattern2.src = pattern2Url;
+    if (patternUrls.length === 0 || patternUrls.length > MAX_PATTERN_URLS) {
+      throw new Error(
+        `MediaEffect expects between 1 and ${MAX_PATTERN_URLS} pattern URLs, got ${patternUrls.length}`
+      );
+    }
+    this.patterns = patternUrls.map((url) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = url;
+      return img;
+    });
     this.fxParams = { ...params };
     this.fragmentShaderSrc = fragmentShaderSrc || defaultShader;
   }
@@ -120,8 +124,7 @@ export class MediaEffect implements EffectRenderer {
     const posBuffer = this.cacheGet(gl, 'positionBuffer')!;
     const texBuffer = this.cacheGet(gl, 'texCoordBuffer')!;
     const texture = this.cacheGet(gl, 'texture')!;
-    const pattern1Texture = this.cacheGet(gl, 'pattern1Texture')!;
-    const pattern2Texture = this.cacheGet(gl, 'pattern2Texture')!;
+    const patternTextures = this.cacheGet(gl, 'patternTextures')!;
 
     if (this.textureManager.updatesOnRender()) {
       gl.activeTexture(gl.TEXTURE0);
@@ -183,22 +186,27 @@ export class MediaEffect implements EffectRenderer {
     const imageLocation = gl.getUniformLocation(program, 'u_image');
     const dimensionsLocation = gl.getUniformLocation(program, 'u_imgDimensions');
     gl.uniform2f(dimensionsLocation, this.imageWidth, this.imageHeight);
-    // pattern + dimensions
-    const patternLocation = gl.getUniformLocation(program, 'u_pattern');
-    const patternDimensionsLocation = gl.getUniformLocation(program, 'u_patternDimensions');
-    const pattern2Location = gl.getUniformLocation(program, 'u_pattern2');
-    const pattern2DimensionsLocation = gl.getUniformLocation(program, 'u_pattern2Dimensions');
-    gl.uniform2f(patternDimensionsLocation, this.pattern1.width, this.pattern1.height);
-    gl.uniform2f(pattern2DimensionsLocation, this.pattern2.width, this.pattern2.height);
+    // patterns + dimensions (u_image = 0, u_pattern = 1, u_pattern2 = 2, u_pattern3 = 3)
+    const patternUniforms = [
+      { tex: 'u_pattern', dim: 'u_patternDimensions' },
+      { tex: 'u_pattern2', dim: 'u_pattern2Dimensions' },
+      { tex: 'u_pattern3', dim: 'u_pattern3Dimensions' },
+    ] as const;
     gl.uniform1i(imageLocation, 0);
-    gl.uniform1i(patternLocation, 1);
-    gl.uniform1i(pattern2Location, 2);
+    for (let i = 0; i < this.patterns.length; i++) {
+      const u = patternUniforms[i];
+      const texLoc = gl.getUniformLocation(program, u.tex);
+      const dimLoc = gl.getUniformLocation(program, u.dim);
+      const p = this.patterns[i];
+      gl.uniform2f(dimLoc, p.width, p.height);
+      gl.uniform1i(texLoc, i + 1);
+    }
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, pattern1Texture);
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, pattern2Texture);
+    for (let i = 0; i < patternTextures.length; i++) {
+      gl.activeTexture(gl.TEXTURE0 + i + 1);
+      gl.bindTexture(gl.TEXTURE_2D, patternTextures[i]!);
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
@@ -242,11 +250,23 @@ export class MediaEffect implements EffectRenderer {
     if (!this.cacheGet(gl, 'texture')) {
       this.loadTexture(gl, this.textureManager.getElement(), 'texture');
     }
-    if (!this.cacheGet(gl, 'pattern1Texture')) {
-      this.loadTexture(gl, this.pattern1, 'pattern1Texture', gl.NEAREST);
-    }
-    if (!this.cacheGet(gl, 'pattern2Texture')) {
-      this.loadTexture(gl, this.pattern2, 'pattern2Texture', gl.NEAREST);
+    if (!this.cacheGet(gl, 'patternTextures')) {
+      if (!this.ready()) return;
+      const patternTextures: WebGLTexture[] = [];
+      for (const pattern of this.patterns) {
+        const t = gl.createTexture();
+        if (!t) continue;
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pattern);
+        patternTextures.push(t);
+      }
+      this.cacheSet(gl, 'patternTextures', patternTextures);
     }
   }
 
