@@ -101,13 +101,9 @@ export class MediaEffect implements EffectRenderer {
     this.vpHeight = height;
   }
 
-    setPatterns(patternsUrls: string[]): void {
-    this.patterns = patternsUrls.map((url) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = url;
-      return img;
-    });
+  async setPatterns(patternUrls: readonly string[]): Promise<void> {
+    const images = await Promise.all(patternUrls.map((url) => this.loadPatternImage(url)));
+    this.patterns = images;
   }
 
   setParam<T extends keyof MediaFxParams>(
@@ -295,6 +291,17 @@ export class MediaEffect implements EffectRenderer {
     }
     this.cache.get(gl)![param] = value;
   }
+
+  private loadPatternImage(url: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error(`Failed to load pattern image: ${url}`));
+      img.src = url;
+    });
+  }
+
 
   private compileProgram(gl: WebGL2RenderingContext): void {
     const program = gl.createProgram();
