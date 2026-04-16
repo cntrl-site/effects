@@ -75,6 +75,9 @@ export class MediaEffect implements EffectRenderer {
   private vpHeight: number = 100;
   private fxParams: MediaFxParams;
   private cache: WeakMap<WebGL2RenderingContext, FxCache> = new WeakMap();
+  /** Contexts that may hold cached `patternTextures`; cleared when patterns change. */
+  private glContextsWithPatternCache = new Set<WebGL2RenderingContext>();
+  private setPatternsRequestId = 0;
   private fragmentShaderSrc: string;
   private statusListeners: ((status: 'ready' | 'error', message?: string) => void)[] = [];
 
@@ -102,8 +105,23 @@ export class MediaEffect implements EffectRenderer {
   }
 
   async setPatterns(patternUrls: readonly string[]): Promise<void> {
+    const requestId = ++this.setPatternsRequestId;
     const images = await Promise.all(patternUrls.map((url) => this.loadPatternImage(url)));
+    if (requestId !== this.setPatternsRequestId) return;
     this.patterns = images;
+    this.invalidatePatternTextures();
+  }
+
+  private invalidatePatternTextures(): void {
+    for (const gl of this.glContextsWithPatternCache) {
+      const pts = this.cacheGet(gl, 'patternTextures');
+      if (pts) {
+        for (const t of pts) {
+          gl.deleteTexture(t);
+        }
+      }
+      this.cacheSet(gl, 'patternTextures', undefined);
+    }
   }
 
   setParam<T extends keyof MediaFxParams>(
@@ -122,10 +140,12 @@ export class MediaEffect implements EffectRenderer {
   }
 
   prepare(gl: WebGL2RenderingContext): void {
+    this.glContextsWithPatternCache.add(gl);
     this.ensureCache(gl);
   }
 
   render(gl: WebGL2RenderingContext): void {
+    this.glContextsWithPatternCache.add(gl);
     if (!this.ready()) return;
     const { time, cursor, ...restParams } = this.fxParams;
     this.ensureCache(gl);
@@ -296,9 +316,9 @@ export class MediaEffect implements EffectRenderer {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.src = url;
       img.onload = () => resolve(img);
       img.onerror = () => reject(new Error(`Failed to load pattern image: ${url}`));
+      img.src = url;
     });
   }
 
