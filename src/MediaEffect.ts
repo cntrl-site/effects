@@ -101,6 +101,15 @@ export class MediaEffect implements EffectRenderer {
     this.vpHeight = height;
   }
 
+    setPatterns(patternsUrls: string[]): void {
+    this.patterns = patternsUrls.map((url) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = url;
+      return img;
+    });
+  }
+
   setParam<T extends keyof MediaFxParams>(
     name: T,
     value: MediaFxParams[T]
