@@ -75,7 +75,6 @@ export class MediaEffect implements EffectRenderer {
   private vpHeight: number = 100;
   private fxParams: MediaFxParams;
   private cache: WeakMap<WebGL2RenderingContext, FxCache> = new WeakMap();
-  /** Contexts that may hold cached `patternTextures`; cleared when patterns change. */
   private glContextsWithPatternCache = new Set<WebGL2RenderingContext>();
   private setPatternsRequestId = 0;
   private fragmentShaderSrc: string;
